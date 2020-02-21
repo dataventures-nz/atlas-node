@@ -1,26 +1,25 @@
-const express = require('express')
-const app = express()
-const cors = require('cors')
-const checkJwt = require('./checkJWT').checkJwt
-require('dotenv').config()
-const bodyParser = require('body-parser')
-const LISTEN_PORT = require('./config.js').LISTEN_PORT
-const MONGO_URI = require('./config.js').MONGO_URI
-const MongoClient = require('mongodb').MongoClient
-const logger = require('morgan')
-const fastCsv = require('fast-csv')
-const moment = require('moment')
+const express = require('express');
+const app = express();
+const cors = require('cors');
+const checkJwt = require('./checkJWT').checkJwt;
+require('dotenv').config();
+const bodyParser = require('body-parser');
+const LISTEN_PORT = require('./config.js').LISTEN_PORT;
+const MONGO_URI = require('./config.js').MONGO_URI;
+const MongoClient = require('mongodb').MongoClient;
+const logger = require('morgan');
+const fastCsv = require('fast-csv');
+const moment = require('moment');
 
-const corsOptions = {} // everything for everyone
+const corsOptions = {}; // everything for everyone
 
-let client = new MongoClient(MONGO_URI, { poolSize:10, useNewUrlParser: true, useUnifiedTopology:true })
-client.connect()
+let client = new MongoClient(MONGO_URI, { poolSize:10, useNewUrlParser: true, useUnifiedTopology:true });
+client.connect();
 
-
-app.use(cors(corsOptions))
-app.use(logger('dev'))
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: true }))
+app.use(cors(corsOptions));
+app.use(logger('dev'));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // deepmap is total overkill here, but I may end up using it in other places.
 function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
@@ -39,6 +38,9 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
     let result = {}
     cache.set(value, result) // Cache to avoid circular references
     for (let key of Object.keys(value)) {
+      if (key in ['$merge','$out','$planCacheStats','$listSessions','$listLocalSessions','$graphLookup','$lookup','$collStats']) {
+        throw 'some pipeline stages are not supported (anything which lets you look up other records), contact Data Ventures if you need to do this'
+      }
       result[key] = deepMap(value[key], mapFn, thisArg, key, cache)
     }
     return result
@@ -48,7 +50,7 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
 }
 
 function formatter(doc) {
-  for (var i in doc) {
+  for (let i in Object.keys(doc)) {
     if (doc[i] instanceof Date) {
       doc[i] =  moment(doc[i]).format('YYYY-MM-DD HH:mm:ss')
     }
@@ -65,12 +67,6 @@ function maybeDate(node) {
   }
 }
 
-function protect(node,key) {
-  if (key in ['$merge','$out','$planCacheStats','$listSessions','$listLocalSessions','$graphLookup','$lookup','$collStats']) {
-    throw 'some pipeline stages are not supported (anything which lets you look up other records), contact Data Ventures if you need to do this'
-  }
-}
-
 async function makeQuery(req) {
   let table = req.params['table']
   let permissions = req.user.permissions
@@ -78,7 +74,7 @@ async function makeQuery(req) {
   let packages = permissions
     .filter(permission => permission.startsWith('api:'))
     .map(permission => permission.replace('api:',''))
-  if (packages.length == 0) { packages = ['anonymous'] }
+  if (packages.length === 0) { packages = ['anonymous'] }
 
   const security_query = {
       'table': table,
@@ -89,10 +85,11 @@ async function makeQuery(req) {
 
   const security = await security_cursor.toArray();
 
-  if (security.length==0) {
+  if (security.length===0) {
     throw "you don't have access to this table"
   }
 
+  console.log("sec",security)
   let matches = security.map(sec => deepMap(JSON.parse(sec.pre),maybeDate))
   let limits = security.map(sec => sec.limit)
   let limit = Math.max(...limits)
@@ -127,7 +124,7 @@ app.get('/subscription/:table', checkJwt, async function(req, res) {
   let packages = permissions
     .filter(permission => permission.startsWith('api:'))
     .map(permission => permission.replace('api:',''))
-  if (packages.length == 0) { packages = ['anonymous'] }
+  if (packages.length === 0) { packages = ['anonymous'] }
   const security_query = {
       'table': table,
       'package':{ '$in':packages }
@@ -136,7 +133,7 @@ app.get('/subscription/:table', checkJwt, async function(req, res) {
   const security_cursor = client.db('population').collection('security').find(security_query)
   res.writeHead(200, { 'Content-Type': 'text/csv' })
   res.flushHeaders()
-  var csvStream = fastCsv.format({ headers: true }).transform(formatter)
+  const csvStream = fastCsv.format({ headers: true }).transform(formatter)
   security_cursor.stream().pipe(csvStream).pipe(res)
 })
 
@@ -144,13 +141,13 @@ async function doQuery(req,res) {
   let q = makeQuery(req)
     q.catch(err => res.status(500).json({ message: err }))
     q.then(function(query,fail) {
-      let cursor = null
       console.log(query, JSON.stringify(query))
-      cursor = client.db('population').collection('population').aggregate(query)
+      let table = req.params['table']
+      let cursor = client.db('population').collection(table).aggregate(query)
       res.setHeader('Content-disposition', 'attachment filename=stuff.csv')
       res.writeHead(200, { 'Content-Type': 'text/csv' })
       res.flushHeaders()
-      var csvStream = fastCsv.format({ headers: true }).transform(formatter)
+      const csvStream = fastCsv.format({ headers: true }).transform(formatter)
       cursor.stream().pipe(csvStream).pipe(res)
     })
 }
