@@ -156,6 +156,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
+app.get('/health', (req,res) => res.send("ok"))
 
 app.use(function(err, req, res, next) {
   console.error(err.stack)
