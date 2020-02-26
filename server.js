@@ -50,7 +50,7 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
 }
 
 function formatter(doc) {
-  for (let i in Object.keys(doc)) {
+  for (let i of Object.keys(doc)) {
     if (doc[i] instanceof Date) {
       doc[i] =  moment(doc[i]).format('YYYY-MM-DD HH:mm:ss')
     }
