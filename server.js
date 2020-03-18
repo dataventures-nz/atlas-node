@@ -6,6 +6,7 @@ require('dotenv').config();
 const bodyParser = require('body-parser');
 const LISTEN_PORT = require('./config.js').LISTEN_PORT;
 const MONGO_URI = require('./config.js').MONGO_URI;
+const DB_NAME = require('./config.js').DB_NAME;
 const MongoClient = require('mongodb').MongoClient;
 const logger = require('morgan');
 const fastCsv = require('fast-csv');
@@ -81,7 +82,7 @@ async function makeQuery(req) {
       'package':{ '$in':packages }
   }
   console.log(security_query)
-  const security_cursor = client.db('population').collection('security').find(security_query)
+  const security_cursor = client.db(DB_NAME).collection('security').find(security_query)
 
   const security = await security_cursor.toArray();
 
@@ -130,7 +131,7 @@ app.get('/subscription/:table', checkJwt, async function(req, res) {
       'package':{ '$in':packages }
   }
   console.log(security_query)
-  const security_cursor = client.db('population').collection('security').find(security_query)
+  const security_cursor = client.db(DB_NAME).collection('security').find(security_query)
   res.writeHead(200, { 'Content-Type': 'text/csv' })
   res.flushHeaders()
   const csvStream = fastCsv.format({ headers: true }).transform(formatter)
