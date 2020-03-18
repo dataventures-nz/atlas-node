@@ -144,7 +144,7 @@ async function doQuery(req,res) {
     q.then(function(query,fail) {
       console.log(query, JSON.stringify(query))
       let table = req.params['table']
-      let cursor = client.db('population').collection(table).aggregate(query)
+      let cursor = client.db(DB_NAME).collection(table).aggregate(query)
       res.setHeader('Content-disposition', 'attachment filename=stuff.csv')
       res.writeHead(200, { 'Content-Type': 'text/csv' })
       res.flushHeaders()
@@ -157,7 +157,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.12"))
+app.get('/health', (req,res) => res.send("ok - version 1.13"))
 
 app.use(function(err, req, res, next) {
   console.error(err.stack)
