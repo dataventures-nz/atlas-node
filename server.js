@@ -81,6 +81,7 @@ async function makeQuery(req) {
       'table': table,
       'package':{ '$in':packages }
   }
+
   console.log(security_query)
   const security_cursor = client.db(DB_NAME).collection('security').find(security_query)
 
@@ -157,7 +158,34 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.13"))
+app.get('/health', (req,res) => res.send("ok - version 1.14"))
+
+app.get('/meta/:api', checkJwt, async function(req, res) {
+  let permissions = req.user.permissions
+  let table = req.params['table']
+  let packages = permissions
+    .filter(permission => permission.startsWith('api:'))
+    .map(permission => permission.replace('api:',''))
+  if (packages.length === 0) { packages = ['anonymous'] }
+  const meta_query = {
+      'api': api,
+      'package':{ '$in':packages }
+  }
+  console.log(meta_query)
+  const meta_cursor = client.db(DB_NAME).collection('meta').find(meta_query)
+  const meta = await meta_cursor.toArray();
+
+  if (meta.length===0) {
+    meta = [{api, defaulting:true, collection:api}]
+  }
+
+  res.writeHead(200, { 'Content-Type': 'text/csv' })
+  res.flushHeaders()
+  const csvStream = fastCsv.format({ headers: true }).transform(formatter)
+  csvStream.pipe(res)
+  csvStream.write(meta[0])
+  csvStream.end()
+})
 
 app.use(function(err, req, res, next) {
   console.error(err.stack)
