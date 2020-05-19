@@ -11,6 +11,7 @@ const MongoClient = require('mongodb').MongoClient;
 const logger = require('morgan');
 const fastCsv = require('fast-csv');
 const moment = require('moment');
+const Stream = require('stream')
 
 const corsOptions = {}; // everything for everyone
 
@@ -158,7 +159,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.21\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.22\n"))
 
 app.get('/meta/:api', checkJwt, async function(req, res) {
   let permissions = req.user.permissions
@@ -179,10 +180,12 @@ app.get('/meta/:api', checkJwt, async function(req, res) {
   }
   res.writeHead(200, { 'Content-Type': 'text/csv' })
   res.flushHeaders()
-  const csvStream = fastCsv.format({ headers: true }).transform(formatter).pipe(res)
-  csvStream.write(meta[0])
-  csvStream.end()
-  req.end()
+  // lets make a stream
+  const readable = new Stream.Readable()
+  readable.push(meta[0])
+  readable.push(null)
+  const csvStream = fastCsv.format({ headers: true }).transform(formatter)
+  readable.stream().pipe(csvStream).pipe(res)
 })
 
 app.use(function(err, req, res, next) {
