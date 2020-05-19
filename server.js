@@ -158,7 +158,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.19\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.20\n"))
 
 app.get('/meta/:api', checkJwt, async function(req, res) {
   let permissions = req.user.permissions
@@ -171,15 +171,12 @@ app.get('/meta/:api', checkJwt, async function(req, res) {
       'api': api,
       'package':{ '$in':packages }
   }
-
   console.log(meta_query)
   const meta_cursor = client.db(DB_NAME).collection('meta').find(meta_query)
-  const meta = await meta_cursor.toArray();
-
+  let meta = await meta_cursor.toArray()
   if (meta.length===0) {
     meta = [{api, defaulting:true, collection:api}]
   }
-
   res.writeHead(200, { 'Content-Type': 'text/csv' })
   res.flushHeaders()
   const csvStream = fastCsv.format({ headers: true }).transform(formatter).pipe(res)
