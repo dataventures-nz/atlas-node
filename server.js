@@ -69,25 +69,26 @@ function maybeDate(node) {
   }
 }
 
-async function makeQuery(req) {
-  let table = req.params['table']
+function getPackages(req) {
   let permissions = req.user.permissions
   console.log(permissions)
   let packages = permissions
     .filter(permission => permission.startsWith('api:'))
     .map(permission => permission.replace('api:',''))
   if (packages.length === 0) { packages = ['anonymous'] }
+  return packages
+}
 
+async function makeQuery(req) {
+  let table = req.params['table']
+  const packages = getPackages(req)
   const security_query = {
       'table': table,
       'package':{ '$in':packages }
   }
-
   console.log(security_query)
   const security_cursor = client.db(DB_NAME).collection('security').find(security_query)
-
   const security = await security_cursor.toArray();
-
   if (security.length===0) {
     throw "you don't have access to this table"
   }
@@ -122,12 +123,8 @@ async function makeQuery(req) {
 }
 
 app.get('/subscription/:table', checkJwt, async function(req, res) {
-  let permissions = req.user.permissions
+  const packages = getPackages(req)
   let table = req.params['table']
-  let packages = permissions
-    .filter(permission => permission.startsWith('api:'))
-    .map(permission => permission.replace('api:',''))
-  if (packages.length === 0) { packages = ['anonymous'] }
   const security_query = {
       'table': table,
       'package':{ '$in':packages }
@@ -141,12 +138,14 @@ app.get('/subscription/:table', checkJwt, async function(req, res) {
 })
 
 async function doQuery(req,res) {
+  let table = req.params['table']
+  const meta = await getMeta(getPackages(req), table)
+  console.log("meta is ", meta)
   let q = makeQuery(req)
     q.catch(err => res.status(500).json({ message: err }))
     q.then(function(query,fail) {
       console.log(query, JSON.stringify(query))
-      let table = req.params['table']
-      let cursor = client.db(DB_NAME).collection(table).aggregate(query)
+      let cursor = client.db(DB_NAME).collection(meta[0].collection).aggregate(query)
       res.setHeader('Content-disposition', 'attachment filename=stuff.csv')
       res.writeHead(200, { 'Content-Type': 'text/csv' })
       res.flushHeaders()
@@ -155,11 +154,23 @@ async function doQuery(req,res) {
     })
 }
 
-
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.22\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.23\n"))
+
+async function getMeta(packages, api) {
+  const meta_query = {
+      'api': api,
+      'package':{ '$in':packages }
+  }
+  const meta_cursor = client.db(DB_NAME).collection('meta').find(meta_query)
+  let meta = await meta_cursor.toArray()
+  if (meta.length===0) {
+    meta = [{api, defaulting:true, collection:api}]
+  }
+  return meta
+}
 
 app.get('/meta/:api', checkJwt, async function(req, res) {
   let permissions = req.user.permissions
@@ -168,24 +179,14 @@ app.get('/meta/:api', checkJwt, async function(req, res) {
     .filter(permission => permission.startsWith('api:'))
     .map(permission => permission.replace('api:',''))
   if (packages.length === 0) { packages = ['anonymous'] }
-  const meta_query = {
-      'api': api,
-      'package':{ '$in':packages }
-  }
-  console.log(meta_query)
-  const meta_cursor = client.db(DB_NAME).collection('meta').find(meta_query)
-  let meta = await meta_cursor.toArray()
-  if (meta.length===0) {
-    meta = [{api, defaulting:true, collection:api}]
-  }
+  let meta = await getMeta(packages,api)
+  console.log("meta for ", packages, api, meta)
   res.writeHead(200, { 'Content-Type': 'text/csv' })
   res.flushHeaders()
-  // lets make a stream
-  const readable = new Stream.Readable()
-  readable.push(meta[0])
-  readable.push(null)
-  const csvStream = fastCsv.format({ headers: true }).transform(formatter)
-  readable.stream().pipe(csvStream).pipe(res)
+  const csvStream = fastCsv.format({ headers: true })
+  csvStream.transform(formatter).pipe(res)
+  csvStream.write(meta[0])
+  csvStream.end()
 })
 
 app.use(function(err, req, res, next) {
