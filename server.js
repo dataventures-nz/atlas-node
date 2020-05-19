@@ -158,11 +158,11 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.17\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.18\n"))
 
 app.get('/meta/:api', checkJwt, async function(req, res) {
   let permissions = req.user.permissions
-  let table = req.params['table']
+  let table = req.params['api']
   let packages = permissions
     .filter(permission => permission.startsWith('api:'))
     .map(permission => permission.replace('api:',''))
