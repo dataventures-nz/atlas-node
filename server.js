@@ -158,7 +158,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, doQuery)
 app.get('/api/:table', checkJwt, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.20\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.21\n"))
 
 app.get('/meta/:api', checkJwt, async function(req, res) {
   let permissions = req.user.permissions
@@ -182,7 +182,7 @@ app.get('/meta/:api', checkJwt, async function(req, res) {
   const csvStream = fastCsv.format({ headers: true }).transform(formatter).pipe(res)
   csvStream.write(meta[0])
   csvStream.end()
-  res.end()
+  req.end()
 })
 
 app.use(function(err, req, res, next) {
