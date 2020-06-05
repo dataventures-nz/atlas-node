@@ -51,6 +51,19 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
   }
 }
 
+function checkTime(req, res, next) {
+  var clockTimestamp = Math.floor(Date.now() / 1000)
+  var exp = req.user.exp
+  if (!req.user.permissions.includes("api:forever")) {
+    if (clockTimestamp >= exp) {
+      throw new TokenExpiredError('maxAge exceeded', new Date(maxAgeTimestamp * 1000))
+    }
+  } else {
+    console.log("WARNING - token never expires")
+  }
+  next()
+}
+
 function formatter(doc) {
   for (let i of Object.keys(doc)) {
     if (doc[i] instanceof Date) {
@@ -122,7 +135,7 @@ async function makeQuery(req) {
   }
 }
 
-app.get('/subscription/:table', checkJwt, async function(req, res) {
+app.get('/subscription/:table', checkJwt, checkTime, async function(req, res) {
   const packages = getPackages(req)
   let table = req.params['table']
   const security_query = {
@@ -154,8 +167,8 @@ async function doQuery(req,res) {
     })
 }
 
-app.post('/api/:table', checkJwt, doQuery)
-app.get('/api/:table', checkJwt, doQuery)
+app.post('/api/:table', checkJwt, checkTime, doQuery)
+app.get('/api/:table', checkJwt, checkTime, doQuery)
 
 app.get('/health', (req,res) => res.send("ok - version 1.23\n"))
 
@@ -172,7 +185,7 @@ async function getMeta(packages, api) {
   return meta
 }
 
-app.get('/meta/:api', checkJwt, async function(req, res) {
+app.get('/meta/:api', checkJwt, checkTime, async function(req, res) {
   let permissions = req.user.permissions
   let api = req.params['api']
   let packages = permissions
