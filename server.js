@@ -170,7 +170,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.23\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.24\n"))
 
 async function getMeta(packages, api) {
   const meta_query = {
