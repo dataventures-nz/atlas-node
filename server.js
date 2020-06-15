@@ -13,7 +13,11 @@ const fastCsv = require('fast-csv');
 const moment = require('moment');
 const Stream = require('stream')
 
-const corsOptions = {}; // everything for everyone
+// This is a service, so, everything for everyone
+// it is meant to be public on the net, and hopefully intergrated into peoples
+// own applications.
+// for security, the calls to it contain JWT
+const corsOptions = {};
 
 let client = new MongoClient(MONGO_URI, { poolSize:10, useNewUrlParser: true, useUnifiedTopology:true });
 client.connect();
@@ -23,7 +27,10 @@ app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// deepmap is total overkill here, but I may end up using it in other places.
+// deepMap is used for 2 things, firstly, we intergrated query sanitisation.
+// yeah, I know, black lists on keys is not ideal, but, there is very little
+// we don't want the user doing. no adding records, no linking back to self or to other tables.
+// we also block some informational requests which people shouldn't have any reason to use.
 function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
   // Use cached value, if present:
   if (cache.has(value)) {
@@ -51,6 +58,11 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
   }
 }
 
+// We check the JWT token here. This is a slight modification so we can flag
+// some 'users' as automationed processes which should last forever.
+// there is a EXTREMELY tiny amount of keys like this (currently 1)
+// and we can change the permission to invalidate it.
+// security, it is about tradeoffs sometimes.
 function checkTime(req, res, next) {
   var clockTimestamp = Math.floor(Date.now() / 1000)
   var exp = req.user.exp
@@ -64,6 +76,10 @@ function checkTime(req, res, next) {
   next()
 }
 
+// in THEORY, we will get getting the format from the user record at some point.
+// in practice, they will get a sensible format, and they will like it.
+// we MAY add timezone support in the future, to a limited degree.
+// and when that day happens, this will be updated.
 function formatter(doc) {
   for (let i of Object.keys(doc)) {
     if (doc[i] instanceof Date) {
@@ -74,6 +90,9 @@ function formatter(doc) {
   return doc
 }
 
+// we need a way to flag something as a date, since, json doesn't do dates.
+// 2012-01-01 is a string. #2012-01-01# is a date.
+// it isn't following a standard, but that is because there isn't a standard to follow.
 function maybeDate(node) {
   if ((node.startsWith && node.endsWith) && node.startsWith('#') && node.endsWith('#')) {
     return new Date(node.replace(/#/g,''))
@@ -82,6 +101,9 @@ function maybeDate(node) {
   }
 }
 
+// users CAN have a lot of permissions NOT applicable to the API.
+// so we filter them out before we do any more processing.
+// it helps reducing noise in logging, among other things.
 function getPackages(req) {
   let permissions = req.user.permissions
   console.log(permissions)
@@ -92,6 +114,11 @@ function getPackages(req) {
   return packages
 }
 
+// ok, here is the meaty inside here.
+// we turn their queries into pipline queries if they are not already.
+// we apply the security model to the start of the query.
+// we check to see what the max size of the query can return (honestly, we could remove this)
+//
 async function makeQuery(req) {
   let table = req.params['table']
   const packages = getPackages(req)
@@ -115,8 +142,10 @@ async function makeQuery(req) {
     req.body = []
   }
 
-  let query = deepMap(req.body, maybeDate) // dates changed to local
-//  query = deepMap(query, protect) // modify the query so you can't breach security
+  // dates are checked and parsed, AND bad keys removed - this is where we sanitise the query.
+  let query = deepMap(req.body, maybeDate)
+
+  // if you were not a pipeline query already, you are now.
   if (query instanceof Array) {
     return [
       {$match:{
@@ -154,6 +183,9 @@ async function doQuery(req,res) {
   let table = req.params['table']
   const meta = await getMeta(getPackages(req), table)
   console.log("meta is ", meta)
+  // TODO: if there is more than one meta, push a log to the admin system saying that we screwed up metadata selectors.
+  // it doesn't give people access to stuff they shouldn't have, but, it is bad since they may get the wrong version of data.
+  // worse yet, it MAY be random.... *gasp*
   let q = makeQuery(req)
     q.catch(err => res.status(500).json({ message: err }))
     q.then(function(query,fail) {
@@ -172,6 +204,8 @@ app.get('/api/:table', checkJwt, checkTime, doQuery)
 
 app.get('/health', (req,res) => res.send("ok - version 1.24\n"))
 
+// note.... THIS has to be fast. since we use it as part of the regular query system.
+// so it will only do one call, and not add a bunch of extra stuff to it.
 async function getMeta(packages, api) {
   const meta_query = {
       'api': api,
@@ -185,6 +219,7 @@ async function getMeta(packages, api) {
   return meta
 }
 
+// and CAN be slower, so we can do extra querys here, and will do so.
 app.get('/meta/:api', checkJwt, checkTime, async function(req, res) {
   let permissions = req.user.permissions
   let api = req.params['api']
@@ -202,6 +237,7 @@ app.get('/meta/:api', checkJwt, checkTime, async function(req, res) {
   csvStream.end()
 })
 
+// error messages.
 app.use(function(err, req, res, next) {
   console.error(err.stack)
   return res.status(err.status).json({ message: err.message })

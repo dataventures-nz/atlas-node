@@ -17,6 +17,8 @@ exports.checkJwt = jwt({
   }),
 
   // Validate the audience and the issuer.
+  // when THEN check the expiration in the main code, so while we ignore it here
+  // it IS checked.
   audience: process.env.AUTH0_AUDIENCE,
   issuer: `https://${process.env.AUTH0_DOMAIN}/`,
   algorithms: ['RS256'],
