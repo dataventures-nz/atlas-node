@@ -47,7 +47,7 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
     let result = {}
     cache.set(value, result) // Cache to avoid circular references
     for (let key of Object.keys(value)) {
-      if (key in ['$merge','$out','$planCacheStats','$listSessions','$listLocalSessions','$graphLookup','$lookup','$collStats']) {
+      if (key.toLowerCase().trim() in ['$merge','$out','$planCacheStats','$listSessions','$listLocalSessions','$graphLookup','$lookup','$collStats']) {
         throw 'some pipeline stages are not supported (anything which lets you look up other records), contact Data Ventures if you need to do this'
       }
       result[key] = deepMap(value[key], mapFn, thisArg, key, cache)
