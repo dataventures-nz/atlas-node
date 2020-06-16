@@ -142,4 +142,4 @@ const safe = [
   "$unwind"
 ].map(x => x.toLowerCase().trim())
 
-exports.isSafe = (key) => !key.includes("$") || safe.includes(key)
+exports.isSafe = (key) => !key.includes("$") || safe.includes(key.toLowerCase().trim())
