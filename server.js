@@ -12,6 +12,7 @@ const logger = require('morgan');
 const fastCsv = require('fast-csv');
 const moment = require('moment');
 const Stream = require('stream')
+const mongoSafe = require('./mongosafe.js').isSafe
 
 // This is a service, so, everything for everyone
 // it is meant to be public on the net, and hopefully intergrated into peoples
@@ -47,7 +48,7 @@ function deepMap(value, mapFn, thisArg, key, cache=new Map()) {
     let result = {}
     cache.set(value, result) // Cache to avoid circular references
     for (let key of Object.keys(value)) {
-      if (key.toLowerCase().trim() in ['$merge','$out','$planCacheStats','$listSessions','$listLocalSessions','$graphLookup','$lookup','$collStats']) {
+      if (!mongoSafe(key)) {
         throw 'some pipeline stages are not supported (anything which lets you look up other records), contact Data Ventures if you need to do this'
       }
       result[key] = deepMap(value[key], mapFn, thisArg, key, cache)
@@ -202,7 +203,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.24\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.25 (whitelist)\n"))
 
 // note.... THIS has to be fast. since we use it as part of the regular query system.
 // so it will only do one call, and not add a bunch of extra stuff to it.
