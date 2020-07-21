@@ -194,8 +194,6 @@ app.get('/subscription', checkJwt, checkTime, async function(req, res) {
   security_cursor.stream().pipe(csvStream).pipe(res)
 })
 
-
-
 async function doQuery(req,res) {
   let table = req.params['table']
   const meta = await getMeta(getPackages(req), table)
@@ -219,7 +217,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.27 (forced restart)\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.28 (updated security model, and security meta)\n"))
 
 // note.... THIS has to be fast. since we use it as part of the regular query system.
 // so it will only do one call, and not add a bunch of extra stuff to it.
