@@ -180,6 +180,22 @@ app.get('/subscription/:table', checkJwt, checkTime, async function(req, res) {
   security_cursor.stream().pipe(csvStream).pipe(res)
 })
 
+app.get('/subscription', checkJwt, checkTime, async function(req, res) {
+  const packages = getPackages(req)
+  let table = req.params['table']
+  const security_query = {
+      'package':{ '$in':packages }
+  }
+  console.log(security_query)
+  const security_cursor = client.db(DB_NAME).collection('security').find(security_query)
+  res.writeHead(200, { 'Content-Type': 'text/csv' })
+  res.flushHeaders()
+  const csvStream = fastCsv.format({ headers: true }).transform(formatter)
+  security_cursor.stream().pipe(csvStream).pipe(res)
+})
+
+
+
 async function doQuery(req,res) {
   let table = req.params['table']
   const meta = await getMeta(getPackages(req), table)
