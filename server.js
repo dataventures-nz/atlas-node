@@ -217,7 +217,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.28 (updated security model, and security meta)\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.29 (meta now auto generates fields)\n"))
 
 // note.... THIS has to be fast. since we use it as part of the regular query system.
 // so it will only do one call, and not add a bunch of extra stuff to it.
@@ -234,6 +234,57 @@ async function getMeta(packages, api) {
   return meta
 }
 
+async function getFieldsFor(table) {
+  const fields_query = [
+    // Since our collections can be too for doing this on the fly, we look at only some documents
+    {$limit: 1000},
+
+    // Convert the root document into an array.
+    {$project: {
+        fields: {
+            $objectToArray: "$$ROOT"
+        }
+    }},
+
+    // Turn each array element into a separate document representing a field-value pair of the root document.
+    {$unwind: "$fields"},
+
+    // Apply the $type projection to the value portion of the field-value pair.
+    {$project: {
+        fields: {
+            k: "$fields.k",
+            v: {$type: "$fields.v"}
+        }
+    }},
+
+    // Grab the first instance of each unique field name.
+    {$group: {
+        _id: "$fields.k",
+        fields: {$first: "$fields"}
+    }},
+
+    // Take the unique field instances and recollect them all into an array.
+    {$group: {
+        _id: null,
+        fields: {$push: "$fields"}
+    }},
+
+    // Convert our array back into an object.
+    {$project: {
+        fields: {$arrayToObject: "$fields"}
+    }},
+
+    // Replace the root document with our nested "fields" sub-document.
+    {$replaceRoot: {
+        newRoot: "$fields"
+    }}
+  ]
+
+  const fields_cursor = client.db(DB_NAME).collection(table).aggregate(fields_query)
+  return fields_cursor.toArray()
+}
+
+
 // and CAN be slower, so we can do extra querys here, and will do so.
 app.get('/meta/:api', checkJwt, checkTime, async function(req, res) {
   let permissions = req.user.permissions
@@ -244,12 +295,10 @@ app.get('/meta/:api', checkJwt, checkTime, async function(req, res) {
   if (packages.length === 0) { packages = ['anonymous'] }
   let meta = await getMeta(packages,api)
   console.log("meta for ", packages, api, meta)
-  res.writeHead(200, { 'Content-Type': 'text/csv' })
-  res.flushHeaders()
-  const csvStream = fastCsv.format({ headers: true })
-  csvStream.transform(formatter).pipe(res)
-  csvStream.write(meta[0])
-  csvStream.end()
+  let fields = await getFieldsFor(meta[0].collection)
+  meta[0].fields = fields[0]
+  console.log("fields for :", meta[0].collection, " = ", fields)
+  res.json(meta[0])
 })
 
 // error messages.
