@@ -217,7 +217,7 @@ async function doQuery(req,res) {
 app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
 
-app.get('/health', (req,res) => res.send("ok - version 1.30b (bounce test)\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.30c (bounce test)\n"))
 
 // note.... THIS has to be fast. since we use it as part of the regular query system.
 // so it will only do one call, and not add a bunch of extra stuff to it.
