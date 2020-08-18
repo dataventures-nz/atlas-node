@@ -214,8 +214,16 @@ async function doQuery(req,res) {
     })
 }
 
+async function doCount(req,res) {
+  let table = req.params['table']
+  const meta = await getMeta(getPackages(req), table)
+  let count = await client.db(DB_NAME).collection(meta[0].collection).estimatedDocumentCount() 
+  res.json({count})
+}
+
 app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
+app.get('/count/:table', checkJwt, checkTime, doCount)
 
 app.get('/health', (req,res) => res.send("ok - version 1.30c (bounce test)\n"))
 
