@@ -151,16 +151,14 @@ async function makeQuery(req) {
     return [
       {$match:{
         $or:matches
-      }},...query,
-      {$limit:limit}
+      }},...query
     ]
   } else {
     return [
       {$match:{
         $or:matches,
       }},
-      {$match:query},
-      {$limit:limit}
+      {$match:query}
     ]
   }
 }
@@ -225,7 +223,7 @@ app.post('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/api/:table', checkJwt, checkTime, doQuery)
 app.get('/count/:table', checkJwt, checkTime, doCount)
 
-app.get('/health', (req,res) => res.send("ok - version 1.31 (count)\n"))
+app.get('/health', (req,res) => res.send("ok - version 1.32 (limits removed)\n"))
 
 // note.... THIS has to be fast. since we use it as part of the regular query system.
 // so it will only do one call, and not add a bunch of extra stuff to it.
