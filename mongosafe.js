@@ -33,6 +33,7 @@ const safe = [
   "$divide",
   "$eq",
   "$exp",
+  "$exists",
   "$filter",
   "$first",
   "$floor",
