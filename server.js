@@ -13,6 +13,7 @@ const fastCsv = require('fast-csv');
 const moment = require('moment');
 const Stream = require('stream')
 const mongoSafe = require('./mongosafe.js').isSafe
+const compression = require('compression');
 
 // This is a service, so, everything for everyone
 // it is meant to be public on the net, and hopefully intergrated into peoples
@@ -23,6 +24,7 @@ const corsOptions = {};
 let client = new MongoClient(MONGO_URI, { poolSize:10, useNewUrlParser: true, useUnifiedTopology:true });
 client.connect();
 
+app.use(compression({ threshold: 0 }))
 app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(bodyParser.json());
